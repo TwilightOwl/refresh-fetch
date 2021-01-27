@@ -3,13 +3,15 @@
 type Configuration = {
   refreshToken: () => Promise<void>,
   shouldRefreshToken: (error: any) => boolean,
-  fetch: (url: any, options: Object) => Promise<any>
+  fetch: (url: any, options: Object) => Promise<any>,
+  minimumRefreshPeriod?: number
 }
 
 function configureRefreshFetch (configuration: Configuration) {
-  const { refreshToken, shouldRefreshToken, fetch } = configuration
+  const { refreshToken, shouldRefreshToken, fetch, minimumRefreshPeriod = 90000 } = configuration
 
   let refreshingTokenPromise = null
+  let lastRefreshTime = Number.NEGATIVE_INFINITY
 
   return (url: any, options: Object) => {
     if (refreshingTokenPromise !== null) {
@@ -24,15 +26,15 @@ function configureRefreshFetch (configuration: Configuration) {
 
     return fetch(url, options).catch(error => {
       if (shouldRefreshToken(error)) {
-        if (refreshingTokenPromise === null) {
+        const timeFromLastRefresh = Date.now() - lastRefreshTime
+        if (timeFromLastRefresh > minimumRefreshPeriod) {
+          lastRefreshTime = Date.now()
           refreshingTokenPromise = new Promise((resolve, reject) => {
             refreshToken()
               .then(() => {
-                refreshingTokenPromise = null
                 resolve()
               })
               .catch(refreshTokenError => {
-                refreshingTokenPromise = null
                 reject(refreshTokenError)
               })
           })
