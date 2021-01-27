@@ -27,20 +27,22 @@ function configureRefreshFetch (configuration: Configuration) {
     return fetch(url, options).catch(error => {
       if (shouldRefreshToken(error)) {
         const timeFromLastRefresh = Date.now() - lastRefreshTime
-        if (timeFromLastRefresh > minimumRefreshPeriod) {
+        if (refreshingTokenPromise === null && timeFromLastRefresh > minimumRefreshPeriod) {
           lastRefreshTime = Date.now()
           refreshingTokenPromise = new Promise((resolve, reject) => {
             refreshToken()
               .then(() => {
+                refreshingTokenPromise = null
                 resolve()
               })
               .catch(refreshTokenError => {
+                refreshingTokenPromise = null
                 reject(refreshTokenError)
               })
           })
         }
 
-        return refreshingTokenPromise
+        return (refreshingTokenPromise || Promise.resolve())
           .catch(() => {
             // If refreshing fails, continue with original error
             throw error
